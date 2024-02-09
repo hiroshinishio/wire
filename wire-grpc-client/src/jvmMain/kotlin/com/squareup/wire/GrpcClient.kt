@@ -22,6 +22,7 @@ import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Protocol.H2_PRIOR_KNOWLEDGE
 import okhttp3.Protocol.HTTP_2
+import okhttp3.internal.toImmutableList
 
 actual abstract class GrpcClient actual constructor() {
   actual abstract fun <S : Any, R : Any> newCall(method: GrpcMethod<S, R>): GrpcCall<S, R>
@@ -92,6 +93,7 @@ actual abstract class GrpcClient actual constructor() {
     private var client: Call.Factory? = null
     private var baseUrl: GrpcHttpUrl? = null
     private var minMessageToCompress: Long = 0L
+    private val grpcInterceptors: MutableList<GrpcInterceptor> = mutableListOf()
 
     fun client(client: OkHttpClient): Builder {
       require(client.protocols.contains(HTTP_2) || client.protocols.contains(H2_PRIOR_KNOWLEDGE)) {
@@ -127,10 +129,15 @@ actual abstract class GrpcClient actual constructor() {
       this.minMessageToCompress = bytes
     }
 
+    fun addGrpcInterceptor(grpcInterceptor: GrpcInterceptor) = apply {
+      grpcInterceptors += grpcInterceptor
+    }
+
     fun build(): GrpcClient = WireGrpcClient(
       client = client ?: throw IllegalArgumentException("client is not set"),
       baseUrl = baseUrl ?: throw IllegalArgumentException("baseUrl is not set"),
       minMessageToCompress = minMessageToCompress,
+      grpcInterceptors = grpcInterceptors.toImmutableList(),
     )
   }
 }
@@ -139,6 +146,7 @@ internal class WireGrpcClient internal constructor(
   internal val client: Call.Factory,
   internal val baseUrl: GrpcHttpUrl,
   internal val minMessageToCompress: Long,
+  internal val grpcInterceptors: List<GrpcInterceptor>,
 ) : GrpcClient() {
   override fun <S : Any, R : Any> newCall(method: GrpcMethod<S, R>): GrpcCall<S, R> {
     return RealGrpcCall(this, method)

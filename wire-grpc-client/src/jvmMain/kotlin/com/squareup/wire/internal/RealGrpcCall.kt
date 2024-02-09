@@ -16,12 +16,16 @@
 package com.squareup.wire.internal
 
 import com.squareup.wire.GrpcCall
+import com.squareup.wire.GrpcInterceptor
 import com.squareup.wire.GrpcMethod
 import com.squareup.wire.WireGrpcClient
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Request
+import okhttp3.Response
 import okio.ForwardingTimeout
 import okio.IOException
 import okio.Timeout
@@ -51,7 +55,20 @@ internal class RealGrpcCall<S : Any, R : Any>(
   override suspend fun execute(request: S): R {
     val call = initCall(request)
 
-    return suspendCancellableCoroutine { continuation ->
+    val originalRequest = call.request()
+
+    val chain = object : GrpcInterceptor.Chain<Request, Response> {
+      override val request: Request
+        get() = originalRequest
+
+      override fun proceed(request: Request): Response {
+        // Call OkHttp, get response
+        val response = call.execute()
+        return response
+      }
+    }
+
+    val response = suspendCancellableCoroutine { continuation ->
       continuation.invokeOnCancellation {
         cancel()
       }
@@ -64,6 +81,7 @@ internal class RealGrpcCall<S : Any, R : Any>(
         override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
           try {
             responseMetadata = response.headers.toMap()
+            chain.proceed()
             val message = response.readExactlyOneAndClose()
             continuation.resume(message)
           } catch (e: IOException) {
@@ -72,6 +90,8 @@ internal class RealGrpcCall<S : Any, R : Any>(
         }
       })
     }
+
+    return response
   }
 
   override fun executeBlocking(request: S): R {
