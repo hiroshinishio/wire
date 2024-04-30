@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package squareup.geology;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.EnumValueOptions {
+  optional string display_name = 40194;
+}
+
+enum Period {
+  CRETACEOUS = 1 [(squareup.geology.display_name) = "Cre taceous"];
+  JURASSIC = 2 [(squareup.geology.display_name) = "Jurassic 2025"];
+  TRIASSIC = 3 [(squareup.geology.display_name) = "Triage"];
+}

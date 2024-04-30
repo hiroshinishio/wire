@@ -1,29 +1,19 @@
-import com.squareup.wire.schema.EventListener
-
 plugins {
   id("java-library")
   kotlin("jvm")
   id("com.squareup.wire")
 }
 
-class MyEventListenerFactory : EventListener.Factory {
-  override fun create(): EventListener {
-    return object: EventListener() {}
-  }
-}
-
 wire {
-  protoLibrary = true
 
   sourcePath {
     srcDir("src/main/proto")
   }
 
-  eventListenerFactory(MyEventListenerFactory())
-
   kotlin {
-    singleMethodServices = true
-    escapeKotlinKeywords = true
+    out = "src/main/kotlin"
+    emitAppliedOptions = true
+    emitDeclaredOptions = true
   }
 }
 
